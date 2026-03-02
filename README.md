@@ -17,6 +17,16 @@ This repo is designed to be easy to run, easy to demo, and easy to explain in a 
   2. Automatically switch to **Map 5** and run **greedy inference** continuously.
 - Saves/loads Q-tables to/from disk so you can resume training or demo without retraining.
 
+### Preview
+
+**Training (Maps 1–4)** — agent explores with ε-greedy and updates the Q-table:
+
+![Training](resource/training.gif)
+
+**Greedy inference (e.g. Map 5)** — trained policy navigating to the goal:
+
+![Testing](resource/testing.gif)
+
 ---
 
 ## Environment definition
@@ -159,6 +169,7 @@ A Pygame window opens and the program starts training the curriculum.
 gridworld_qlearn/
 ├── main.py
 ├── README.md
+├── resource/           # demo GIFs (training.gif, testing.gif)
 └── q_tables/           # generated (saved Q-tables)
 ```
 
