@@ -414,7 +414,7 @@ def main():
 
     # Auto curriculum: train Map 1-4, then run greedy inference on Map 5
     TRAIN_MAP_COUNT = 4          # train Map 1..4
-    EPISODES_PER_MAP = 50        # episodes per training map
+    EPISODES_PER_MAP = 200       # episodes per training map
 
     env = GridWorld(
         grid=grid, start=start, goal=goal,
@@ -544,7 +544,7 @@ def main():
 
         agent.decay_epsilon()
 
-        # Save after episode 1 and episode 50 (per map)
+        # Save after episode 1 and then every 50 episodes (per map)
         if ep_on_map == 1 or ep_on_map % 50 == 0:
             path = q_path(current_map_idx)
             np.save(path, agent.Q)
