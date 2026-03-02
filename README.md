@@ -167,29 +167,12 @@ A Pygame window opens and the program starts training the curriculum.
 
 Metrics are logged per map; below are example plots (return, steps to goal, success rate) from a single run.
 
-### Map 1
-
-| Return | Steps | Success |
-|:------:|:-----:|:-------:|
-| ![Map 1 Return](results/map1_20260302_161424_return.png) | ![Map 1 Steps](results/map1_20260302_161424_steps.png) | ![Map 1 Success](results/map1_20260302_161424_success.png) |
-
-### Map 2
-
-| Return | Steps | Success |
-|:------:|:-----:|:-------:|
-| ![Map 2 Return](results/map2_20260302_161509_return.png) | ![Map 2 Steps](results/map2_20260302_161509_steps.png) | ![Map 2 Success](results/map2_20260302_161509_success.png) |
-
-### Map 3
-
-| Return | Steps | Success |
-|:------:|:-----:|:-------:|
-| ![Map 3 Return](results/map3_20260302_161535_return.png) | ![Map 3 Steps](results/map3_20260302_161535_steps.png) | ![Map 3 Success](results/map3_20260302_161535_success.png) |
-
-### Map 4
-
-| Return | Steps | Success |
-|:------:|:-----:|:-------:|
-| ![Map 4 Return](results/map4_20260302_161558_return.png) | ![Map 4 Steps](results/map4_20260302_161558_steps.png) | ![Map 4 Success](results/map4_20260302_161558_success.png) |
+| Map   | Return | Steps | Success |
+|:-----:|:------:|:-----:|:-------:|
+| Map 1 | ![Map 1 Return](results/map1_20260302_161424_return.png) | ![Map 1 Steps](results/map1_20260302_161424_steps.png) | ![Map 1 Success](results/map1_20260302_161424_success.png) |
+| Map 2 | ![Map 2 Return](results/map2_20260302_161509_return.png) | ![Map 2 Steps](results/map2_20260302_161509_steps.png) | ![Map 2 Success](results/map2_20260302_161509_success.png) |
+| Map 3 | ![Map 3 Return](results/map3_20260302_161535_return.png) | ![Map 3 Steps](results/map3_20260302_161535_steps.png) | ![Map 3 Success](results/map3_20260302_161535_success.png) |
+| Map 4 | ![Map 4 Return](results/map4_20260302_161558_return.png) | ![Map 4 Steps](results/map4_20260302_161558_steps.png) | ![Map 4 Success](results/map4_20260302_161558_success.png) |
 
 ---
 
