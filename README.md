@@ -1,6 +1,6 @@
 
 
-# GridWorld Q-Learning (Pygame)
+# GridWorld Q-Learning
 
 A compact **tabular Q-learning** project built around a custom **GridWorld** environment and a **Pygame** UI. The agent learns to navigate mazes with walls, traps, and collectible bonuses, then demonstrates its learned behavior via greedy inference.
 
