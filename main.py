@@ -27,7 +27,7 @@ class GridWorld:
       0 = Free
       1 = Wall
       2 = Trap (terminal)
-      3 = Bonus (small reward, repeatable in MVP)
+      3 = Bonus (collectible; disappears after collection within an episode)
       4 = Start
       5 = Goal (terminal)
     """
@@ -75,6 +75,15 @@ class GridWorld:
         self.steps = 0
         return self._state_id(self.pos)
 
+    def set_map(self, grid: np.ndarray, start: Tuple[int, int], goal: Tuple[int, int]):
+        """Switch to a new map (same HxW assumed). Resets collectibles and position."""
+        self.original_grid = grid.copy()
+        self.grid = grid.copy()
+        self.H, self.W = grid.shape
+        self.start = start
+        self.goal = goal
+        self.reset()
+
     def _state_id(self, pos: Tuple[int, int]) -> int:
         x, y = pos
         return y * self.W + x
@@ -115,7 +124,7 @@ class GridWorld:
                 done = True
             elif cell == 3:  # Bonus
                 reward += self.bonus_reward
-                # Bonus disappears after being collected (modern collectible behavior)
+                # Bonus disappears after being collected
                 self.grid[ny, nx] = 0
 
         # shaping (optional): encourage moving closer to goal
@@ -139,22 +148,23 @@ class GridWorld:
         )
 
 
-def build_default_map() -> Tuple[np.ndarray, Tuple[int, int], Tuple[int, int]]:
-    """
-    A simple 10x10 maze.
-    """
-    H, W = 10, 10
-    grid = np.zeros((H, W), dtype=np.int32)
+def build_maps() -> List[Tuple[str, np.ndarray, Tuple[int, int], Tuple[int, int]]]:
+    """Return 5 fixed 10x10 maps: (name, grid, start, goal)."""
 
-    start = (0, 0)
-    goal = (9, 9)
+    def make_base() -> Tuple[np.ndarray, Tuple[int, int], Tuple[int, int]]:
+        H, W = 10, 10
+        grid = np.zeros((H, W), dtype=np.int32)
+        start = (0, 0)
+        goal = (9, 9)
+        grid[start[1], start[0]] = 4
+        grid[goal[1], goal[0]] = 5
+        return grid, start, goal
 
-    grid[start[1], start[0]] = 4
-    grid[goal[1], goal[0]] = 5
+    maps: List[Tuple[str, np.ndarray, Tuple[int, int], Tuple[int, int]]] = []
 
-    # Walls
+    # Map 1: original MVP map
+    grid, start, goal = make_base()
     walls = [
-        # vertical-ish barrier
         (2, 0), (2, 1), (2, 2), (2, 3), (2, 4),
         (5, 5), (5, 6), (5, 7),
         (7, 2), (7, 3), (7, 4), (7, 5),
@@ -164,19 +174,122 @@ def build_default_map() -> Tuple[np.ndarray, Tuple[int, int], Tuple[int, int]]:
         if (x, y) not in [start, goal]:
             grid[y, x] = 1
 
-    # Traps (terminal)
     traps = [(4, 2), (6, 1), (8, 6)]
     for x, y in traps:
         if (x, y) not in [start, goal]:
             grid[y, x] = 2
 
-    # Bonus cells
     bonuses = [(1, 3), (4, 6), (8, 2)]
     for x, y in bonuses:
         if (x, y) not in [start, goal]:
             grid[y, x] = 3
 
-    return grid, start, goal
+    maps.append(("Map 1", grid, start, goal))
+
+    # Map 2: corridor + detour
+    grid, start, goal = make_base()
+    walls = [
+        (1, 1), (2, 1), (3, 1), (4, 1), (5, 1),
+        (5, 2), (5, 3), (5, 4),
+        (3, 3), (3, 4), (3, 5),
+        (7, 6), (8, 6),
+        (1, 7), (2, 7), (3, 7), (4, 7),
+    ]
+    for x, y in walls:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 1
+
+    traps = [(6, 2), (7, 3), (2, 6)]
+    for x, y in traps:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 2
+
+    bonuses = [(1, 4), (6, 5), (8, 1)]
+    for x, y in bonuses:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 3
+
+    maps.append(("Map 2", grid, start, goal))
+
+    # Map 3: central block with two openings
+    grid, start, goal = make_base()
+    walls = []
+    for x in range(2, 8):
+        walls.append((x, 4))
+    for y in range(2, 8):
+        walls.append((4, y))
+    # openings
+    walls.remove((4, 3))
+    walls.remove((6, 4))
+    for x, y in walls:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 1
+
+    traps = [(2, 2), (7, 7), (6, 2)]
+    for x, y in traps:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 2
+
+    bonuses = [(1, 5), (5, 1), (8, 5)]
+    for x, y in bonuses:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 3
+
+    maps.append(("Map 3", grid, start, goal))
+
+    # Map 4: zig-zag walls
+    grid, start, goal = make_base()
+    walls = [
+        (1, 2), (2, 2), (3, 2),
+        (3, 3), (3, 4),
+        (2, 4), (1, 4),
+        (5, 5), (6, 5), (7, 5),
+        (7, 6), (7, 7),
+        (6, 7), (5, 7),
+    ]
+    for x, y in walls:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 1
+
+    traps = [(4, 3), (6, 6), (2, 8)]
+    for x, y in traps:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 2
+
+    bonuses = [(0, 5), (4, 6), (9, 3)]
+    for x, y in bonuses:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 3
+
+    maps.append(("Map 4", grid, start, goal))
+
+    # Map 5: harder test map
+    grid, start, goal = make_base()
+    walls = [
+        (2, 0), (2, 1), (2, 2),
+        (4, 2), (5, 2), (6, 2),
+        (6, 3), (6, 4),
+        (1, 5), (2, 5), (3, 5),
+        (8, 6), (8, 7),
+        (4, 7), (5, 7), (6, 7),
+    ]
+    for x, y in walls:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 1
+
+    traps = [(3, 1), (7, 4), (5, 8)]
+    for x, y in traps:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 2
+
+    bonuses = [(1, 3), (7, 1), (3, 8)]
+    for x, y in bonuses:
+        if (x, y) not in [start, goal]:
+            grid[y, x] = 3
+
+    maps.append(("Map 5", grid, start, goal))
+
+    return maps
 
 
 # -------------------------
@@ -199,8 +312,12 @@ class QLearningAgent:
         self.Q = np.zeros((n_states, n_actions), dtype=np.float32)
 
     def act(self, state: int, greedy: bool = False) -> int:
+        """Select an action using ε-greedy. If choosing greedily, break ties randomly."""
         if greedy or random.random() > self.eps:
-            return int(np.argmax(self.Q[state]))
+            q_row = self.Q[state]
+            max_q = float(np.max(q_row))
+            best_actions = np.flatnonzero(q_row == max_q)
+            return int(random.choice(best_actions))
         return random.randint(0, self.n_actions - 1)
 
     def update(self, s: int, a: int, r: float, s_next: int, done: bool):
@@ -222,12 +339,10 @@ class GridUI:
         self.env = env
         self.cell = cell_size
         self.pad = pad
-        # Slightly smaller fonts so the info panel fits better on different displays
         self.font = pygame.font.SysFont("Menlo", 16)
         self.small = pygame.font.SysFont("Menlo", 13)
 
         w = env.W * cell_size + pad * 2
-        # Increase panel height so the bottom line is never clipped
         h = env.H * cell_size + pad * 2 + 160
         self.screen = pygame.display.set_mode((w, h))
         pygame.display.set_caption("GridWorld Q-Learning (MVP)")
@@ -245,7 +360,6 @@ class GridUI:
                 rect = self._cell_rect(x, y)
                 cell = int(self.env.grid[y, x])
 
-                # Colors (keep simple)
                 if cell == 1:      color = (60, 60, 60)      # wall
                 elif cell == 2:    color = (220, 80, 80)     # trap
                 elif cell == 3:    color = (120, 200, 120)   # bonus
@@ -259,14 +373,12 @@ class GridUI:
         # draw agent
         ax, ay = self.env.pos
         arect = self._cell_rect(ax, ay)
-        center = arect.center
-        pygame.draw.circle(self.screen, (40, 120, 200), center, self.cell // 3)
+        pygame.draw.circle(self.screen, (40, 120, 200), arect.center, self.cell // 3)
 
         # info panel
-        # Start the info panel a bit higher to leave margin at the bottom
         base_y = self.pad + self.env.H * self.cell + 12
         lines = [
-            f"Mode: {info_panel.get('mode','')}   Episode: {info_panel.get('episode',0)}   Step: {info_panel.get('step',0)}",
+            f"Mode: {info_panel.get('mode','')}   Ep(map): {info_panel.get('episode',0)}   Step: {info_panel.get('step',0)}",
             f"Action: {info_panel.get('action_str','')}   Reward: {info_panel.get('reward',0):+.3f}   Return: {info_panel.get('return',0):+.3f}",
             f"Epsilon: {info_panel.get('epsilon',0):.3f}   Done: {info_panel.get('done',False)}   InvalidMove: {info_panel.get('invalid',False)}"
         ]
@@ -274,7 +386,7 @@ class GridUI:
             surf = self.font.render(txt, True, (30, 30, 30))
             self.screen.blit(surf, (self.pad, base_y + i * 28))
 
-        help_txt = "Keys: [T] Train/Pause  [Y] Test (greedy)  [S] Toggle Speed  [R] Reset  [P] Save Q  [ESC] Quit"
+        help_txt = "Keys: [T] Train/Pause  [Y] Test (greedy)  [S] Speed  [R] Reset  [P] Save Q  [1-5] Switch Map  [ESC] Quit"
         surf2 = self.small.render(help_txt, True, (60, 60, 60))
         self.screen.blit(surf2, (self.pad, base_y + 96))
 
@@ -295,79 +407,131 @@ def action_to_str(a: int) -> str:
 
 
 def main():
-    grid, start, goal = build_default_map()
+    maps = build_maps()  # 5 maps: (name, grid, start, goal)
+    current_map_idx = 0
+    map_name, grid, start, goal = maps[current_map_idx]
+
+    # Auto curriculum: train Map 1-4, then run greedy inference on Map 5
+    TRAIN_MAP_COUNT = 4          # train Map 1..4
+    EPISODES_PER_MAP = 50        # episodes per training map
+
     env = GridWorld(
         grid=grid, start=start, goal=goal,
-        use_shaping=False,  # MVP: 先关掉，跑通后你再打开
+        use_shaping=False,
         shaping_lambda=0.1,
         max_steps=200
     )
 
     n_states = env.H * env.W
     n_actions = 4
+
+    # One Q-table per map
+    q_tables: List[np.ndarray] = [np.zeros((n_states, n_actions), dtype=np.float32) for _ in range(len(maps))]
+
     agent = QLearningAgent(
         n_states=n_states, n_actions=n_actions,
         alpha=0.2, gamma=0.95,
         eps_start=1.0, eps_end=0.05, eps_decay=0.995
     )
+    agent.Q = q_tables[current_map_idx]
 
-    # -------------------------
-    # 4.5) Save / Load Q-table
-    # -------------------------
-    Q_PATH = "q_table.npy"
+    # Save / Load Q-tables
+    Q_DIR = "q_tables"
+    os.makedirs(Q_DIR, exist_ok=True)
 
-    # If a trained Q-table exists, load it and default to greedy (epsilon=0)
-    if os.path.exists(Q_PATH):
-        agent.Q = np.load(Q_PATH)
-        agent.eps = 0.0
-        print(f"Loaded Q table from {Q_PATH}. (epsilon set to 0)")
-    else:
-        print(f"No saved Q table found at {Q_PATH}. Train to generate one.")
+    def q_path(idx: int) -> str:
+        return os.path.join(Q_DIR, f"q_table_map{idx+1}.npy")
+
+    for i in range(len(maps)):
+        path = q_path(i)
+        if os.path.exists(path):
+            q_tables[i] = np.load(path)
+            print(f"Loaded Q table for Map {i+1} from {path}")
+
+    agent.Q = q_tables[current_map_idx]
 
     ui = GridUI(env)
 
-    # toggles
     training = True
     paused = False
     fast = False
 
-    # metrics
     ep_returns: List[float] = []
     ep_steps: List[int] = []
     ep_success: List[int] = []
 
-    episode = 0
+    # Per-map episode counters
+    episodes_seen: List[int] = [0 for _ in range(len(maps))]
+
     state = env.reset()
     ep_return = 0.0
     step_in_ep = 0
 
-    def end_episode(done_reason: str):
-        nonlocal episode, state, ep_return, step_in_ep
-        # success if on goal
-        success = 1 if env.pos == env.goal else 0
-        ep_returns.append(ep_return)
-        ep_steps.append(step_in_ep)
-        ep_success.append(success)
-
-        episode += 1
-        agent.decay_epsilon()
-        # Save the learned Q-table periodically to reduce disk I/O.
-        # This writes/overwrites the same file `q_table.npy` every 50 episodes.
-        if episode == 1 or episode % 50 == 0:
-            np.save(Q_PATH, agent.Q)
-            print(f"Auto-saved Q table to {Q_PATH} at episode {episode}")
-        state = env.reset()
-        ep_return = 0.0
-        step_in_ep = 0
-
-    # for testing mode
     pending_test = False
     test_state = None
     test_return = 0.0
     test_step = 0
 
+    def end_episode(done_reason: str):
+        nonlocal state, ep_return, step_in_ep, current_map_idx, map_name, grid, start, goal, training, pending_test, test_state, test_return, test_step, paused
+
+        success = 1 if env.pos == env.goal else 0
+        ep_returns.append(ep_return)
+        ep_steps.append(step_in_ep)
+        ep_success.append(success)
+
+        episodes_seen[current_map_idx] += 1
+        ep_on_map = episodes_seen[current_map_idx]
+
+        agent.decay_epsilon()
+
+        # Save after episode 1 and episode 50 (per map)
+        if ep_on_map == 1 or ep_on_map % 50 == 0:
+            path = q_path(current_map_idx)
+            np.save(path, agent.Q)
+            print(f"Auto-saved Q table for Map {current_map_idx+1} to {path} at map-episode {ep_on_map}")
+
+        # Curriculum switching
+        if training and current_map_idx < TRAIN_MAP_COUNT and ep_on_map >= EPISODES_PER_MAP:
+            # Final save for this training map
+            path = q_path(current_map_idx)
+            np.save(path, agent.Q)
+            print(f"Finished training {map_name}: saved Q to {path}")
+
+            # Advance to next map
+            current_map_idx += 1
+            map_name, grid, start, goal = maps[current_map_idx]
+            env.set_map(grid, start, goal)
+            agent.Q = q_tables[current_map_idx]
+
+            # Arrive at Map 5 => greedy inference
+            if current_map_idx >= TRAIN_MAP_COUNT:
+                agent.eps = 0.0
+                training = False
+                paused = False
+                pending_test = True
+                test_state = env.reset()
+                test_return = 0.0
+                test_step = 0
+
+                state = test_state
+                ep_return = 0.0
+                step_in_ep = 0
+                print(f"Switched to {map_name} for greedy inference")
+                return
+
+            # Otherwise keep training on next map
+            state = env.reset()
+            ep_return = 0.0
+            step_in_ep = 0
+            print(f"Switched to {map_name} for training")
+            return
+
+        state = env.reset()
+        ep_return = 0.0
+        step_in_ep = 0
+
     while True:
-        # handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 ui.quit()
@@ -376,29 +540,49 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     ui.quit()
                     sys.exit(0)
+
                 if event.key == pygame.K_t:
-                    training = True
+                    # Toggle pause. Only allow forcing training while in training maps.
+                    if current_map_idx < TRAIN_MAP_COUNT:
+                        training = True
                     paused = not paused
+
                 if event.key == pygame.K_s:
                     fast = not fast
+
                 if event.key == pygame.K_r:
-                    # reset env + stats (keep Q table)
                     state = env.reset()
                     ep_return = 0.0
                     step_in_ep = 0
+
                 if event.key == pygame.K_y:
-                    # run one greedy test episode (pure inference)
                     agent.eps = 0.0
                     training = False
                     pending_test = True
                     test_state = env.reset()
                     test_return = 0.0
                     test_step = 0
-                if event.key == pygame.K_p:
-                    np.save(Q_PATH, agent.Q)
-                    print(f"Saved Q table to {Q_PATH}")
 
-        # decide one step
+                if event.key == pygame.K_p:
+                    path = q_path(current_map_idx)
+                    np.save(path, agent.Q)
+                    print(f"Saved Q table for Map {current_map_idx+1} to {path}")
+
+                # manual map switch (still supported)
+                if pygame.K_1 <= event.key <= pygame.K_5:
+                    idx = event.key - pygame.K_1
+                    if 0 <= idx < len(maps):
+                        current_map_idx = idx
+                        map_name, grid, start, goal = maps[current_map_idx]
+                        env.set_map(grid, start, goal)
+                        agent.Q = q_tables[current_map_idx]
+                        state = env.reset()
+                        ep_return = 0.0
+                        step_in_ep = 0
+                        if not training:
+                            agent.eps = 0.0
+                        print(f"Switched to {map_name}")
+
         if training and not paused:
             a = agent.act(state, greedy=False)
             res = env.step(a)
@@ -412,8 +596,8 @@ def main():
                 end_episode("done")
 
             panel = {
-                "mode": "TRAIN" + (" (FAST)" if fast else ""),
-                "episode": episode,
+                "mode": f"TRAIN {map_name}" + (" (FAST)" if fast else ""),
+                "episode": episodes_seen[current_map_idx],
                 "step": step_in_ep,
                 "action_str": action_to_str(a),
                 "reward": res.reward,
@@ -424,7 +608,6 @@ def main():
             }
 
         elif (not training) and pending_test:
-            # test step: greedy
             a = agent.act(test_state, greedy=True)
             res = env.step(a)
             test_state = res.next_state
@@ -432,14 +615,14 @@ def main():
             test_step += 1
 
             if res.done:
-                # Auto-restart another greedy test episode for continuous inference demo
+                # continuous inference demo
                 test_state = env.reset()
                 test_return = 0.0
                 test_step = 0
 
             panel = {
-                "mode": "TEST (GREEDY)",
-                "episode": episode,
+                "mode": f"TEST (GREEDY) {map_name}",
+                "episode": episodes_seen[current_map_idx],
                 "step": test_step,
                 "action_str": action_to_str(a),
                 "reward": res.reward,
@@ -449,10 +632,9 @@ def main():
                 "invalid": res.info.get("invalid_move", False)
             }
         else:
-            # idle panel
             panel = {
-                "mode": "PAUSED" if paused else "IDLE",
-                "episode": episode,
+                "mode": f"PAUSED {map_name}" if paused else f"IDLE {map_name}",
+                "episode": episodes_seen[current_map_idx],
                 "step": step_in_ep,
                 "action_str": "-",
                 "reward": 0.0,
@@ -464,57 +646,8 @@ def main():
 
         ui.draw(panel)
 
-        # speed control
-        fps = 60 if not fast else 600  # fast mode trains faster
+        fps = 60 if not fast else 600
         ui.tick(fps)
-
-        # optional: stop after enough episodes, then switch to inference (greedy test)
-        if training and episode == 50:
-            np.save(Q_PATH, agent.Q)
-            print(f"Final save: Q table written to {Q_PATH}")
-
-            # Switch to inference mode (do not update Q-table)
-            agent.eps = 0.0
-            training = False
-            paused = False
-            pending_test = True
-            test_state = env.reset()
-            test_return = 0.0
-            test_step = 0
-
-    ui.quit()
-
-    # Plot metrics (for report)
-    returns = np.array(ep_returns, dtype=np.float32)
-    steps = np.array(ep_steps, dtype=np.float32)
-    success = np.array(ep_success, dtype=np.float32)
-
-    def moving_avg(x, k=20):
-        if len(x) < k:
-            return x
-        return np.convolve(x, np.ones(k)/k, mode="valid")
-
-    plt.figure()
-    plt.title("Episode Return (moving avg)")
-    plt.plot(moving_avg(returns, 20))
-    plt.xlabel("Episode")
-    plt.ylabel("Return")
-    plt.show()
-
-    plt.figure()
-    plt.title("Episode Steps (moving avg)")
-    plt.plot(moving_avg(steps, 20))
-    plt.xlabel("Episode")
-    plt.ylabel("Steps")
-    plt.show()
-
-    plt.figure()
-    plt.title("Success Rate (moving avg)")
-    plt.plot(moving_avg(success, 20))
-    plt.xlabel("Episode")
-    plt.ylabel("Success(Goal=1)")
-    plt.ylim(-0.05, 1.05)
-    plt.show()
 
 
 if __name__ == "__main__":
