@@ -8,6 +8,7 @@ import numpy as np
 import pygame
 import matplotlib.pyplot as plt
 import os
+from datetime import datetime
 
 
 # -------------------------
@@ -456,9 +457,67 @@ def main():
     paused = False
     fast = False
 
-    ep_returns: List[float] = []
-    ep_steps: List[int] = []
-    ep_success: List[int] = []
+    # Per-map metrics (store training curves separately for each map)
+    metrics = [
+        {"returns": [], "steps": [], "success": []} for _ in range(len(maps))
+    ]
+
+    # Directory for saving visualizations
+    RESULTS_DIR = "results"
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+
+    def _moving_avg(x: np.ndarray, k: int) -> np.ndarray:
+        if len(x) < k:
+            return x
+        return np.convolve(x, np.ones(k) / k, mode="valid")
+
+    def save_map_visualizations(map_idx: int, name: str):
+        """Save key training results (return/steps/success curves) for a given map."""
+        r = np.array(metrics[map_idx]["returns"], dtype=np.float32)
+        s = np.array(metrics[map_idx]["steps"], dtype=np.float32)
+        c = np.array(metrics[map_idx]["success"], dtype=np.float32)
+
+        # Choose a reasonable smoothing window for short runs
+        win = 10 if len(r) >= 10 else max(1, len(r))
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        prefix = os.path.join(RESULTS_DIR, f"map{map_idx+1}_{ts}")
+
+        # 1) Episode Return
+        plt.figure()
+        plt.title(f"{name} - Episode Return (moving avg)")
+        plt.plot(_moving_avg(r, win))
+        plt.xlabel("Episode")
+        plt.ylabel("Return")
+        plt.tight_layout()
+        plt.savefig(prefix + "_return.png", dpi=200)
+        plt.close()
+
+        # 2) Episode Steps
+        plt.figure()
+        plt.title(f"{name} - Episode Steps (moving avg)")
+        plt.plot(_moving_avg(s, win))
+        plt.xlabel("Episode")
+        plt.ylabel("Steps")
+        plt.tight_layout()
+        plt.savefig(prefix + "_steps.png", dpi=200)
+        plt.close()
+
+        # 3) Success Rate
+        plt.figure()
+        plt.title(f"{name} - Success Rate (moving avg)")
+        plt.plot(_moving_avg(c, win))
+        plt.xlabel("Episode")
+        plt.ylabel("Success (Goal=1)")
+        plt.ylim(-0.05, 1.05)
+        plt.tight_layout()
+        plt.savefig(prefix + "_success.png", dpi=200)
+        plt.close()
+
+        # Save raw metrics too (handy for report)
+        np.savez(prefix + "_metrics.npz", returns=r, steps=s, success=c)
+
+        print(f"Saved training visualizations for {name} to {RESULTS_DIR}/ (prefix: {os.path.basename(prefix)})")
 
     # Per-map episode counters
     episodes_seen: List[int] = [0 for _ in range(len(maps))]
@@ -476,9 +535,9 @@ def main():
         nonlocal state, ep_return, step_in_ep, current_map_idx, map_name, grid, start, goal, training, pending_test, test_state, test_return, test_step, paused, fast
 
         success = 1 if env.pos == env.goal else 0
-        ep_returns.append(ep_return)
-        ep_steps.append(step_in_ep)
-        ep_success.append(success)
+        metrics[current_map_idx]["returns"].append(ep_return)
+        metrics[current_map_idx]["steps"].append(step_in_ep)
+        metrics[current_map_idx]["success"].append(success)
 
         episodes_seen[current_map_idx] += 1
         ep_on_map = episodes_seen[current_map_idx]
@@ -497,6 +556,9 @@ def main():
             path = q_path(current_map_idx)
             np.save(path, agent.Q)
             print(f"Finished training {map_name}: saved Q to {path}")
+
+            # Save key training results (plots + raw arrays) for this map
+            save_map_visualizations(current_map_idx, map_name)
 
             # Advance to next map
             current_map_idx += 1
@@ -519,6 +581,9 @@ def main():
                 state = test_state
                 ep_return = 0.0
                 step_in_ep = 0
+                # Optional: ensure the last trained map has plots saved before demo
+                # (Map 4 will already be saved above, but this keeps behavior robust)
+                
                 print(f"Switched to {map_name} for greedy inference")
                 return
 
