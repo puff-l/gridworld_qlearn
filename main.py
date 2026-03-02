@@ -473,7 +473,7 @@ def main():
     test_step = 0
 
     def end_episode(done_reason: str):
-        nonlocal state, ep_return, step_in_ep, current_map_idx, map_name, grid, start, goal, training, pending_test, test_state, test_return, test_step, paused
+        nonlocal state, ep_return, step_in_ep, current_map_idx, map_name, grid, start, goal, training, pending_test, test_state, test_return, test_step, paused, fast
 
         success = 1 if env.pos == env.goal else 0
         ep_returns.append(ep_return)
@@ -509,6 +509,8 @@ def main():
                 agent.eps = 0.0
                 training = False
                 paused = False
+                # Demo on Map 5 at normal speed
+                fast = False
                 pending_test = True
                 test_state = env.reset()
                 test_return = 0.0
@@ -548,7 +550,11 @@ def main():
                     paused = not paused
 
                 if event.key == pygame.K_s:
-                    fast = not fast
+                    # Speed toggle only applies during training; keep inference demo at normal speed
+                    if training:
+                        fast = not fast
+                    else:
+                        fast = False
 
                 if event.key == pygame.K_r:
                     state = env.reset()
@@ -646,7 +652,14 @@ def main():
 
         ui.draw(panel)
 
-        fps = 60 if not fast else 600
+        # Speed control
+        # - Training: normal (60) or fast (600)
+        # - Inference on Map 5: cinematic 24 FPS for demo
+        # - Other inference: 60 FPS
+        if training:
+            fps = 60 if not fast else 600
+        else:
+            fps = 24 if current_map_idx >= TRAIN_MAP_COUNT else 60
         ui.tick(fps)
 
 
