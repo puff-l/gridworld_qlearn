@@ -171,7 +171,7 @@ Metrics are logged per map; below are example plots (return, steps to goal, succ
 |:-----:|:------:|:-----:|:-------:|
 | Map 1 | ![Map 1 Return](results/map1_20260302_184342_return.png) | ![Map 1 Steps](results/map1_20260302_184342_steps.png) | ![Map 1 Success](results/map1_20260302_184342_success.png) |
 | Map 2 | ![Map 2 Return](results/map2_20260302_184400_return.png) | ![Map 2 Steps](results/map2_20260302_184400_steps.png) | ![Map 2 Success](results/map2_20260302_184400_success.png) |
-| Map 3 | ![Map 3 Return](results/map3_20260302_161535_return.png) | ![Map 3 Steps](results/map3_20260302_184414_steps.png) | ![Map 3 Success](results/map3_20260302_184414_success.png) |
+| Map 3 | ![Map 3 Return](results/map3_20260302_184414_return.png) | ![Map 3 Steps](results/map3_20260302_184414_steps.png) | ![Map 3 Success](results/map3_20260302_184414_success.png) |
 | Map 4 | ![Map 4 Return](results/map4_20260302_184424_return.png) | ![Map 4 Steps](results/map4_20260302_184424_steps.png) | ![Map 4 Success](results/map4_20260302_184424_success.png) |
 
 ---
