@@ -7,6 +7,7 @@ from typing import Tuple, List
 import numpy as np
 import pygame
 import matplotlib.pyplot as plt
+import os
 
 
 # -------------------------
@@ -46,7 +47,10 @@ class GridWorld:
                  use_shaping: bool = False,
                  shaping_lambda: float = 0.1,
                  max_steps: int = 200):
-        self.grid = grid
+        # Keep an immutable copy of the initial map so we can reset collectibles each episode
+        self.original_grid = grid.copy()
+        # Work on a mutable per-episode grid (bonus cells can disappear when collected)
+        self.grid = grid.copy()
         self.H, self.W = grid.shape
         self.start = start
         self.goal = goal
@@ -65,6 +69,8 @@ class GridWorld:
         self.steps = 0
 
     def reset(self) -> int:
+        # Restore the grid so collectibles (bonus cells) are available again each episode
+        self.grid = self.original_grid.copy()
         self.pos = self.start
         self.steps = 0
         return self._state_id(self.pos)
@@ -109,6 +115,8 @@ class GridWorld:
                 done = True
             elif cell == 3:  # Bonus
                 reward += self.bonus_reward
+                # Bonus disappears after being collected (modern collectible behavior)
+                self.grid[ny, nx] = 0
 
         # shaping (optional): encourage moving closer to goal
         if self.use_shaping:
@@ -214,11 +222,13 @@ class GridUI:
         self.env = env
         self.cell = cell_size
         self.pad = pad
-        self.font = pygame.font.SysFont("Menlo", 18)
-        self.small = pygame.font.SysFont("Menlo", 14)
+        # Slightly smaller fonts so the info panel fits better on different displays
+        self.font = pygame.font.SysFont("Menlo", 16)
+        self.small = pygame.font.SysFont("Menlo", 13)
 
         w = env.W * cell_size + pad * 2
-        h = env.H * cell_size + pad * 2 + 120
+        # Increase panel height so the bottom line is never clipped
+        h = env.H * cell_size + pad * 2 + 160
         self.screen = pygame.display.set_mode((w, h))
         pygame.display.set_caption("GridWorld Q-Learning (MVP)")
         self.clock = pygame.time.Clock()
@@ -253,7 +263,8 @@ class GridUI:
         pygame.draw.circle(self.screen, (40, 120, 200), center, self.cell // 3)
 
         # info panel
-        base_y = self.pad + self.env.H * self.cell + 20
+        # Start the info panel a bit higher to leave margin at the bottom
+        base_y = self.pad + self.env.H * self.cell + 12
         lines = [
             f"Mode: {info_panel.get('mode','')}   Episode: {info_panel.get('episode',0)}   Step: {info_panel.get('step',0)}",
             f"Action: {info_panel.get('action_str','')}   Reward: {info_panel.get('reward',0):+.3f}   Return: {info_panel.get('return',0):+.3f}",
@@ -263,9 +274,9 @@ class GridUI:
             surf = self.font.render(txt, True, (30, 30, 30))
             self.screen.blit(surf, (self.pad, base_y + i * 28))
 
-        help_txt = "Keys: [T] Train/Pause  [Y] Test(1 episode)  [S] Toggle Speed  [R] Reset  [ESC] Quit"
+        help_txt = "Keys: [T] Train/Pause  [Y] Test (greedy)  [S] Toggle Speed  [R] Reset  [P] Save Q  [ESC] Quit"
         surf2 = self.small.render(help_txt, True, (60, 60, 60))
-        self.screen.blit(surf2, (self.pad, base_y + 90))
+        self.screen.blit(surf2, (self.pad, base_y + 96))
 
         pygame.display.flip()
 
@@ -300,6 +311,19 @@ def main():
         eps_start=1.0, eps_end=0.05, eps_decay=0.995
     )
 
+    # -------------------------
+    # 4.5) Save / Load Q-table
+    # -------------------------
+    Q_PATH = "q_table.npy"
+
+    # If a trained Q-table exists, load it and default to greedy (epsilon=0)
+    if os.path.exists(Q_PATH):
+        agent.Q = np.load(Q_PATH)
+        agent.eps = 0.0
+        print(f"Loaded Q table from {Q_PATH}. (epsilon set to 0)")
+    else:
+        print(f"No saved Q table found at {Q_PATH}. Train to generate one.")
+
     ui = GridUI(env)
 
     # toggles
@@ -327,6 +351,11 @@ def main():
 
         episode += 1
         agent.decay_epsilon()
+        # Save the learned Q-table periodically to reduce disk I/O.
+        # This writes/overwrites the same file `q_table.npy` every 50 episodes.
+        if episode == 1 or episode % 50 == 0:
+            np.save(Q_PATH, agent.Q)
+            print(f"Auto-saved Q table to {Q_PATH} at episode {episode}")
         state = env.reset()
         ep_return = 0.0
         step_in_ep = 0
@@ -358,12 +387,16 @@ def main():
                     ep_return = 0.0
                     step_in_ep = 0
                 if event.key == pygame.K_y:
-                    # run one greedy test episode
+                    # run one greedy test episode (pure inference)
+                    agent.eps = 0.0
                     training = False
                     pending_test = True
                     test_state = env.reset()
                     test_return = 0.0
                     test_step = 0
+                if event.key == pygame.K_p:
+                    np.save(Q_PATH, agent.Q)
+                    print(f"Saved Q table to {Q_PATH}")
 
         # decide one step
         if training and not paused:
@@ -399,7 +432,10 @@ def main():
             test_step += 1
 
             if res.done:
-                pending_test = False
+                # Auto-restart another greedy test episode for continuous inference demo
+                test_state = env.reset()
+                test_return = 0.0
+                test_step = 0
 
             panel = {
                 "mode": "TEST (GREEDY)",
@@ -432,9 +468,19 @@ def main():
         fps = 60 if not fast else 600  # fast mode trains faster
         ui.tick(fps)
 
-        # optional: stop after enough episodes, auto-plot
-        if training and episode == 400:
-            break
+        # optional: stop after enough episodes, then switch to inference (greedy test)
+        if training and episode == 50:
+            np.save(Q_PATH, agent.Q)
+            print(f"Final save: Q table written to {Q_PATH}")
+
+            # Switch to inference mode (do not update Q-table)
+            agent.eps = 0.0
+            training = False
+            paused = False
+            pending_test = True
+            test_state = env.reset()
+            test_return = 0.0
+            test_step = 0
 
     ui.quit()
 
